@@ -1,0 +1,58 @@
+proc import datafile = '/folders/myfolders/alley/timecards.csv'
+ out = work.alley
+ dbms = CSV 
+ ;
+run;
+
+*clean and set up data struc;
+data al.TotalTime;
+	set work.alley(firstobs=3 rename=(The_Alley_Yonge = firstName) rename=(VAR2 = lastName) 
+		drop=VAR4 VAR5 VAR12);
+	ID = input(VAR3, comma9.);
+	scheHours = input(VAR6, comma9.);
+	totPaid = input(VAR7, comma9.);
+	regularHour = input(VAR8, comma9.);
+	estOT = input(VAR9, comma9.);
+	unpaidBread = input(VAR10, comma9.);
+	estWage = input(VAR11, comma9.);
+	Variance = input(VAR13, comma9.);
+	where upcase(firstName) not like '%TOTAL%';
+	drop VAR3 VAR6-VAR11 VAR13;
+run;
+
+proc sort data=al.totaltime;
+	by descending regularHour descending scheHours;
+run;
+
+ods rtf file="/folders/myfolders/alley/check.rtf" startpage=no;
+
+*comparing avg regular hour;
+proc sgplot data=al.totaltime;
+	title "regular hours";
+	vbar firstname / response= regularHour;
+run;
+title;
+
+*process statistics data;
+proc means data=al.totaltime mean max min maxdec=2;
+	id firstName;
+	vars regularHour scheHours;
+run;
+
+*detecting outlier;
+*in process;
+proc univariate data=al.totaltime noprint;
+	var regularHour;
+run;
+
+ods rtf startpage=yes;
+
+*ppl with less work day scheduled;
+proc report  data=al.totaltime(keep= firstName lastName scheHours regularHour estWage estOT);
+	title "people with less scheduled hours and regular hours than average";
+	where scheHours LE 33.53;
+	where also regularHour LE 32.78;
+run;
+title;
+
+ods rtf close;
